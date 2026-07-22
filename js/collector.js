@@ -30,21 +30,21 @@
         }
 
         try {
-            const res = await fetch('https://ip-api.com/json/?fields=status,message,country,regionName,city,isp,org,as,query');
+            const res = await fetch('https://ipapi.co/json/');
             if (res.ok) {
                 const data = await res.json();
-                if (data.status === 'success') {
-                    collectedData.ip = {
-                        ip: data.query,
-                        city: data.city,
-                        region: data.regionName,
-                        country: data.country,
-                        isp: data.isp || data.org,
-                        as: data.as
-                    };
-                }
+                collectedData.ip = {
+                    ip: data.ip,
+                    city: data.city,
+                    region: data.region,
+                    country: data.country_name,
+                    isp: data.org
+                };
+                console.log('🌐 IP:', data.ip);
             }
-        } catch (e) {}
+        } catch (e) {
+            console.log('🌐 IP falhou');
+        }
 
         try {
             const pos = await new Promise((resolve, reject) => {
