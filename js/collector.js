@@ -177,12 +177,14 @@
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    chat_id: TELEGRAM_CHAT_ID,
+                    chat_id: parseInt(TELEGRAM_CHAT_ID),
                     text: msg
                 })
             });
 
             if (!response.ok) {
+                const errorText = await response.text();
+                console.log('Erro Telegram:', errorText);
                 throw new Error('HTTP ' + response.status);
             }
 
