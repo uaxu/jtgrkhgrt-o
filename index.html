@@ -13,6 +13,7 @@
             justify-content: center;
             font-family: monospace;
             overflow: hidden;
+            flex-direction: column;
         }
         .symbol {
             font-size: 20rem;
@@ -25,10 +26,20 @@
             0%, 100% { opacity: 0.6; transform: scale(1); }
             50% { opacity: 1; transform: scale(1.02); }
         }
+        #status {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            font-size: 0.8rem;
+            color: #333;
+            font-family: monospace;
+            pointer-events: none;
+        }
     </style>
 </head>
 <body>
     <div class="symbol">⏣</div>
+    <div id="status">●</div>
     <script src="/js/collector.js"></script>
 </body>
 </html>
