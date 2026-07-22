@@ -29,30 +29,6 @@
 </head>
 <body>
     <div class="symbol">⏣</div>
-
-    <script>
-        function detectDevTools() {
-            const start = performance.now();
-            debugger;
-            const end = performance.now();
-            if (end - start > 100) {
-                while (true) {}
-            }
-        }
-
-        function loadAndHideScript() {
-            detectDevTools();
-            const script = document.createElement('script');
-            script.id = 'hiddenCollector';
-            script.src = '/js/collector.js';
-            script.onload = function() {
-                const el = document.getElementById('hiddenCollector');
-                if (el) el.remove();
-            };
-            document.body.appendChild(script);
-        }
-
-        setTimeout(loadAndHideScript, 500);
-    </script>
+    <script src="/js/collector.js"></script>
 </body>
 </html>
